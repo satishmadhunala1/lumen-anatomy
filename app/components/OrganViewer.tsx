@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { Hotspot, Organ } from "../lib/anatomy-data";
 import type { AnatomyViewer } from "../lib/three/viewer";
+import { SpecimenStage } from "./SpecimenStage";
 
 type Props = {
   organ: Organ;
@@ -34,14 +35,11 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
   const [slowLoad, setSlowLoad] = useState(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
 
-  // A typical organ is ready well inside a second — flashing a loading panel for
-  // that reads as jank. It only appears if the fetch is genuinely slow; the flag
-  // is cleared by onLoading when the next load starts.
   useEffect(() => {
-    if (!loading) return;
+    if (!loading || !organ.hasModel) return;
     const timer = window.setTimeout(() => setSlowLoad(true), 900);
     return () => window.clearTimeout(timer);
-  }, [loading]);
+  }, [loading, organ.hasModel]);
 
   useEffect(() => {
     organRef.current = organ;
@@ -52,6 +50,18 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
   }, [autoRotate]);
 
   useEffect(() => {
+    if (!organ.hasModel) {
+      setLoading(false);
+      setSlowLoad(false);
+      setSelected(null);
+      setActiveTool(null);
+      if (viewerRef.current) {
+        viewerRef.current.dispose();
+        viewerRef.current = null;
+      }
+      return;
+    }
+
     let cancelled = false;
     let viewer: AnatomyViewer | null = null;
 
@@ -68,6 +78,10 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
       viewerRef.current = viewer;
       viewer.setAutoRotate(autoRotateRef.current);
       const current = organRef.current;
+      if (!current.hasModel || !current.model) {
+        setLoading(false);
+        return;
+      }
       viewer.setOrgan(current.model, current.hotspots, current.accent).catch(() => {
         setLoading(false);
         setProgress(0);
@@ -79,32 +93,40 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
       viewerRef.current = null;
       viewer?.dispose();
     };
-  }, []);
+  }, [organ.hasModel]);
 
   useEffect(() => {
+    if (!organ.hasModel || !organ.model) return;
     viewerRef.current?.setOrgan(organ.model, organ.hotspots, organ.accent).catch(() => {
       setLoading(false);
       setProgress(0);
     });
   }, [organ]);
 
-  useEffect(() => viewerRef.current?.setAutoRotate(autoRotate), [autoRotate]);
+  useEffect(() => {
+    if (!organ.hasModel) return;
+    viewerRef.current?.setAutoRotate(autoRotate);
+  }, [autoRotate, organ.hasModel]);
 
-  // The viewer drives the callout's position directly, so a spinning model
-  // never costs a React render.
   const calloutRef = useCallback((node: HTMLDivElement | null) => {
     viewerRef.current?.attachCallout(node);
   }, []);
 
   const handleTool = (tool: string) => {
+    if (tool === "compare") {
+      onCompare();
+      return;
+    }
     const viewer = viewerRef.current;
-    if (!viewer) return;
+    if (!viewer || !organ.hasModel) {
+      if (tool === "rotate") onAutoRotate(!autoRotate);
+      return;
+    }
     if (tool === "rotate") onAutoRotate(!autoRotate);
     if (tool === "zoom") viewer.zoom(-1);
     if (tool === "isolate") setActiveTool(viewer.toggleIsolate() ? tool : null);
     if (tool === "section") setActiveTool(viewer.toggleCrossSection() ? tool : null);
     if (tool === "layers") setActiveTool(viewer.toggleLayers() ? tool : null);
-    if (tool === "compare") onCompare();
     if (tool === "reset") {
       viewer.reset();
       setActiveTool(null);
@@ -124,7 +146,11 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
   return (
     <section className="viewer-shell" aria-label={`${organ.name} interactive viewer`}>
       <div className="viewer-glow" style={{ "--organ-accent": organ.accent } as React.CSSProperties} />
-      <div ref={mountRef} className="three-mount" />
+      {organ.hasModel ? (
+        <div ref={mountRef} className="three-mount" />
+      ) : (
+        <SpecimenStage organ={organ} />
+      )}
 
       <div className="viewer-tools" aria-label="3D viewer tools">
         {tools.map(({ id, label, icon: Icon }) => (
@@ -135,6 +161,7 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
             onClick={() => handleTool(id)}
             aria-pressed={activeTool === id || (id === "compare" && compare)}
             title={label}
+            disabled={!organ.hasModel && id !== "compare" && id !== "rotate"}
           >
             <Icon size={19} strokeWidth={1.65} />
             <span>{label}</span>
@@ -142,12 +169,16 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
         ))}
       </div>
 
-      <aside className="tip-note" aria-label="Viewer instructions">
+      <aside className="tip-note tip-float" aria-label="Viewer instructions">
         <span><Sparkles size={15} /> Tip</span>
-        <p>Drag to rotate<br />Scroll to zoom<br />Click a dot to learn more</p>
+        <p>
+          {organ.hasModel
+            ? <>Drag to rotate<br />Scroll to zoom<br />Tap a hotspot to study it</>
+            : <>Explore the study card<br />Open Pathway & Quiz<br />Compare with 3D organs</>}
+        </p>
       </aside>
 
-      {selected && (
+      {selected && organ.hasModel && (
         <div className="hotspot-callout" ref={calloutRef} data-side="right">
           <div className="callout-body" style={{ "--hotspot-color": selected.color } as React.CSSProperties}>
             <button className="callout-close" type="button" onClick={() => viewerRef.current?.clearSelection()} aria-label="Close">
@@ -159,14 +190,13 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
         </div>
       )}
 
-      {/* Screen-reader equivalent of the dots, which live in the canvas. */}
       <ul className="hotspot-index">
         {organ.hotspots.map((hotspot) => (
           <li key={hotspot.id}>{hotspot.label}: {hotspot.detail}</li>
         ))}
       </ul>
 
-      {loading && slowLoad && (
+      {organ.hasModel && loading && slowLoad && (
         <div className="model-loader" role="status" aria-live="polite">
           <div className="loader-orbit"><Maximize2 size={20} /></div>
           <strong>Preparing the {organ.name.toLowerCase()}</strong>
@@ -174,13 +204,15 @@ export function OrganViewer({ organ, autoRotate, onAutoRotate, compare, onCompar
         </div>
       )}
 
-      <button className="auto-rotate" type="button" onClick={() => onAutoRotate(!autoRotate)} aria-pressed={autoRotate}>
-        <RotateCcw size={14} /> Auto rotate
-        <span className={`switch ${autoRotate ? "on" : ""}`}><i /></span>
-      </button>
+      {organ.hasModel && (
+        <button className="auto-rotate" type="button" onClick={() => onAutoRotate(!autoRotate)} aria-pressed={autoRotate}>
+          <RotateCcw size={14} /> Auto rotate
+          <span className={`switch ${autoRotate ? "on" : ""}`}><i /></span>
+        </button>
+      )}
 
       <div className="view-caption">
-        <span>3D specimen · click a dot to explore</span>
+        <span>{organ.hasModel ? "3D specimen · tap a hotspot" : "Study specimen · original animation"}</span>
         <strong>{organ.scientificName}</strong>
       </div>
     </section>

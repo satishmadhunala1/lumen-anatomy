@@ -1,14 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, DM_Sans } from "next/font/google";
+import { Fraunces, Outfit } from "next/font/google";
 import "./globals.css";
 
-const sans = DM_Sans({
+const sans = Outfit({
   variable: "--font-sans",
   subsets: ["latin"],
 });
 
-const serif = Cormorant_Garamond({
-  variable: "--font-serif",
+const display = Fraunces({
+  variable: "--font-display",
   subsets: ["latin"],
 });
 
@@ -16,7 +16,7 @@ const OG_IMAGE = {
   url: "/og.jpg",
   width: 1200,
   height: 675,
-  alt: "An anatomical heart specimen floating above a plinth, beside the Anatomy Atelier wordmark",
+  alt: "Lumen — interactive 3D human anatomy explorer",
 };
 
 /**
@@ -34,11 +34,11 @@ const siteUrl =
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "Anatomy Atelier — Learn anatomy like an artist",
+  title: "Lumen — Interactive anatomy studio",
   description:
-    "Explore medically detailed 3D organs — heart, brain, lungs, liver, kidneys, eye, intestine, pancreas, and skin — through an elegant, interactive anatomy atelier.",
-  applicationName: "Anatomy Atelier",
-  keywords: ["anatomy", "3D anatomy", "human body", "medical education", "interactive learning", "organs"],
+    "Original interactive anatomy experience: 15 specimens, animated pathways, quizzes, flashcards, developmental timelines, and myth-busting — built for curious learners.",
+  applicationName: "Lumen",
+  keywords: ["anatomy", "3D anatomy", "human body", "medical education", "interactive learning", "organs", "quiz", "flashcards", "pathway", "lumen"],
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
@@ -50,21 +50,21 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
-    siteName: "Anatomy Atelier",
-    title: "Anatomy Atelier — Learn anatomy like an artist",
-    description: "Learn anatomy like an artist through immersive, medically detailed 3D specimens.",
+    siteName: "Lumen",
+    title: "Lumen — See inside the body",
+    description: "Interactive 3D anatomy with quizzes, flashcards, and systems exploration.",
     images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Anatomy Atelier — Learn anatomy like an artist",
-    description: "Learn anatomy like an artist through immersive, medically detailed 3D specimens.",
+    title: "Lumen — See inside the body",
+    description: "Interactive 3D anatomy with quizzes, flashcards, and systems exploration.",
     images: [OG_IMAGE],
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f7f0e7",
+  themeColor: "#e8f1f4",
 };
 
 export default function RootLayout({
@@ -74,9 +74,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${sans.variable} ${serif.variable}`}
-      >
+      <body className={`${sans.variable} ${display.variable}`}>
         {children}
       </body>
     </html>
